@@ -1,8 +1,11 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using Windows.Devices.Display;
 
 namespace WpfFixedTest;
 
@@ -19,30 +22,26 @@ public partial class MainWindow : Window
 		_source.AddHook(WndProc);
 	}
 
-	public DpiScale FixedDpi { get; } = new DpiScale(1, 1);
+	public DpiScale InitialDpi { get; private set; }
 
-	protected override void OnSourceInitialized(EventArgs e)
+	protected override async void OnSourceInitialized(EventArgs e)
 	{
 		base.OnSourceInitialized(e);
 
-		var initialDpi = VisualTreeHelper.GetDpi(this);
-		Debug.WriteLine($"Initial DPI: {initialDpi.PixelsPerDip}");
-		var (factorX, factorY) = (FixedDpi.DpiScaleX / initialDpi.DpiScaleX, FixedDpi.DpiScaleY / initialDpi.DpiScaleY);
+		// VisualTreeHelper.GetDpi method seems to return System DPI even if the window doesn't
+		// start in the primary monitor.
+		InitialDpi = DpiHelper.GetDpi(this);
+		Debug.WriteLine($"Initial DPI: {InitialDpi.PixelsPerDip}");
 
-		var content = this.Content as FrameworkElement;
-		if (content is not null)
-		{
-			content.LayoutTransform = new ScaleTransform(factorX, factorY);
-		}
+		await AdjustAsync();
 	}
 
 	private const int WM_DPICHANGED = 0x02E0;
 
-	private nint WndProc(nint hwnd, int msg, nint wParam, nint lParam, ref bool handled)
+	private IntPtr WndProc(nint hwnd, int msg, nint wParam, nint lParam, ref bool handled)
 	{
 		if (msg is WM_DPICHANGED)
 		{
-			Debug.WriteLine("DPI Changed");
 			handled = true;
 		}
 		return IntPtr.Zero;
@@ -53,5 +52,56 @@ public partial class MainWindow : Window
 		_source?.RemoveHook(WndProc);
 
 		base.OnClosed(e);
+	}
+
+	private void WindowRoot_MouseDown(object sender, MouseButtonEventArgs e)
+	{
+		if (Mouse.LeftButton is MouseButtonState.Pressed)
+		{
+			this.DragMove();
+		}
+	}
+
+	private async void Check_Click(object sender, RoutedEventArgs e)
+	{
+		await AdjustAsync();
+	}
+
+	private void Close_Click(object sender, RoutedEventArgs e)
+	{
+		this.Close();
+	}
+
+	public DisplayMonitor? MonitorInfo
+	{
+		get { return (DisplayMonitor?)GetValue(MonitorInfoProperty); }
+		set { SetValue(MonitorInfoProperty, value); }
+	}
+	public static readonly DependencyProperty MonitorInfoProperty =
+		DependencyProperty.Register("MonitorInfo", typeof(DisplayMonitor), typeof(MainWindow), new PropertyMetadata(defaultValue: null));
+
+	public double ExpectedPhysicalWidthInInches
+	{
+		get { return (double)GetValue(ExpectedPhysicalWidthInInchesProperty); }
+		set { SetValue(ExpectedPhysicalWidthInInchesProperty, value); }
+	}
+	public static readonly DependencyProperty ExpectedPhysicalWidthInInchesProperty =
+		DependencyProperty.Register("ExpectedPhysicalWidthInInches", typeof(double), typeof(MainWindow), new PropertyMetadata(0D));
+
+	private async Task AdjustAsync()
+	{
+		MonitorInfo = await DisplayMonitorHelper.GetDisplayMonitorAsync(this);
+		if (MonitorInfo is null)
+			return;
+
+		var (factorX, factorY) = (MonitorInfo.RawDpiX / InitialDpi.PixelsPerInchX,
+								  MonitorInfo.RawDpiY / InitialDpi.PixelsPerInchY);
+
+		var content = this.Content as FrameworkElement;
+		if (content is not null)
+		{
+			content.LayoutTransform = new ScaleTransform(factorX, factorY);
+			ExpectedPhysicalWidthInInches = content.Width / DpiHelper.DefaultPixelsPerInch;
+		}
 	}
 }

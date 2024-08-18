@@ -7,12 +7,41 @@
         mc:Ignorable="d"
 		x:Name="WindowRoot"
         Title="Fixed Window"
-		SizeToContent="WidthAndHeight">
-	<Grid Width="800" Height="400">
-		<TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
-				   FontSize="32">
-			<Run Text="Fixed DPI: "/>
-			<Run Text="{Binding ElementName=WindowRoot, Path=FixedDpi.PixelsPerDip, Mode=OneTime}"/>
-		</TextBlock>
+		ResizeMode="NoResize"
+		SizeToContent="WidthAndHeight"
+		WindowStyle="None"
+		FontSize="20"
+		MouseDown="WindowRoot_MouseDown">
+	<Window.Resources>
+		<local:InchToCentimeterConverter x:Key="converter"/>
+	</Window.Resources>
+
+	<Grid Width="400" Height="300">
+		<Grid.RowDefinitions>
+			<RowDefinition Height="*"/>
+			<RowDefinition Height="Auto"/>
+		</Grid.RowDefinitions>
+
+		<Button HorizontalAlignment="Right" VerticalAlignment="Top"
+				Padding="8"
+				BorderThickness="0"
+				Background="Transparent"
+				FontFamily="Segoe MDL2 Assets"
+				Content="&#xE711;"
+				Click="Close_Click"/>
+
+		<StackPanel Grid.Row="0" 
+					HorizontalAlignment="Center" VerticalAlignment="Center">
+			<TextBlock Text="{Binding ElementName=WindowRoot, Path=MonitorInfo.PhysicalSizeInInches.Width, Mode=OneWay, Converter={StaticResource converter}, StringFormat=Monitor Physical Width (cm): {0:f2}}"/>
+			<TextBlock Text="{Binding ElementName=WindowRoot, Path=MonitorInfo.PhysicalSizeInInches.Height, Mode=OneWay, Converter={StaticResource converter}, StringFormat=Monitor Physical Height (cm): {0:f2}}"/>
+			<TextBlock Text="{Binding ElementName=WindowRoot, Path=MonitorInfo.RawDpiX, Mode=OneWay, StringFormat=Monitor Raw DPI X: {0:f2}}"/>
+			<TextBlock Text="{Binding ElementName=WindowRoot, Path=MonitorInfo.RawDpiY, Mode=OneWay, StringFormat=Monitor Raw DPI Y: {0:f2}}"/>
+			<TextBlock Text="{Binding ElementName=WindowRoot, Path=ExpectedPhysicalWidthInInches, Mode=OneWay, Converter={StaticResource converter}, StringFormat=Expected Physical Width (cm): {0:f2}}"/>
+		</StackPanel>
+
+		<Button Grid.Row="1"
+				Height="40"
+				Content="Check &amp; Adjust"
+				Click="Check_Click"/>
 	</Grid>
 </Window>
